@@ -6,6 +6,28 @@ public class Main {
     public static final Map<Integer, Integer> sizeToFreq = new HashMap<>();
 
     public static void main(String[] args) throws InterruptedException {
+        final Thread leadingSizePrinterThread = new Thread(() -> {
+            try {
+                while (!Thread.interrupted()) {
+                    synchronized (sizeToFreq) {
+                        sizeToFreq.wait();
+                        if (!sizeToFreq.isEmpty()) {
+                            Map.Entry<Integer, Integer> leaderSize
+                                    = Collections.max(sizeToFreq.entrySet(), Map.Entry.comparingByValue());
+                            System.out.printf("%s %d (%s %d)%n",
+                                    "Лидирующий размер:",
+                                    leaderSize.getKey(),
+                                    "Кол-во повторений:",
+                                    leaderSize.getValue());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+
+            }
+        });
+        leadingSizePrinterThread.start();
+
         final ExecutorService threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         final List<Callable<Boolean>> tasks = new ArrayList<>();
         int numberOfThreads = 1000;
@@ -22,12 +44,14 @@ public class Main {
                     } else {
                         sizeToFreq.compute(count, (k, v) -> v = 1);
                     }
+                    sizeToFreq.notify();
                 }
                 return true;
             });
         }
         threadPool.invokeAll(tasks);
         threadPool.shutdown();
+        leadingSizePrinterThread.interrupt();
         printSizeToFrequency(sizeToFreq);
     }
 
